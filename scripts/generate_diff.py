@@ -124,27 +124,62 @@ class DiffGenerator:
             'Content-Type': 'application/json'
         }
         
-        # Prepare payload with messages array
-        payload = {
-            "messages": [diff_content]
-        }
+        # Try different payload formats for Databricks compatibility
+        payload_formats = [
+            # Format 1: Simple messages array
+            {
+                "messages": [diff_content]
+            },
+            # Format 2: Dataframe records format (common for Databricks)
+            {
+                "dataframe_records": [
+                    {
+                        "input": diff_content,
+                        "context": "code_review"
+                    }
+                ]
+            },
+            # Format 3: Direct input format
+            {
+                "input": diff_content
+            },
+            # Format 4: Text format
+            {
+                "text": diff_content
+            }
+        ]
         
-        try:
-            print(f"🔍 Calling Databricks endpoint for code review...")
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                print(f"✅ Successfully received AI code review")
-                return result
-            else:
-                print(f"❌ Error calling Databricks endpoint: {response.status_code}")
-                print(f"Response: {response.text}")
-                return None
+        for i, payload in enumerate(payload_formats, 1):
+            try:
+                serialized_payload = json.dumps(payload, ensure_ascii=False)
+                print(f"📤 Attempt {i}: Sending payload to Databricks API:")
+                print(f"   URL: {url}")
+                print(f"   Payload format: {list(payload.keys())}")
+                print(f"   Payload size: {len(serialized_payload)} characters")
                 
-        except Exception as e:
-            print(f"❌ Exception calling Databricks endpoint: {e}")
-            return None
+                response = requests.post(url, headers=headers, data=serialized_payload, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    print(f"✅ Successfully received AI code review (format {i})")
+                    print(f"   Response size: {len(response.text)} characters")
+                    return result
+                else:
+                    print(f"❌ Format {i} failed: {response.status_code}")
+                    print(f"Response: {response.text}")
+                    if i < len(payload_formats):
+                        print(f"   Trying next format...")
+                    continue
+                    
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON serialization error (format {i}): {e}")
+                continue
+            except Exception as e:
+                print(f"❌ Exception calling Databricks endpoint (format {i}): {e}")
+                continue
+        
+        print("❌ All payload formats failed")
+        return None
     
     def create_pr_comment(self, ai_review: Dict, diff_content: str, commit_info: Dict[str, str]) -> str:
         """
