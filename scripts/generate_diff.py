@@ -124,100 +124,50 @@ class DiffGenerator:
             'Content-Type': 'application/json'
         }
         
-        # Try different payload formats based on error messages
-        payload_formats = [
-            # Format 1: dataframe_records with proper context structure
-            {
-                "dataframe_records": [
-                    {
-                        "input": diff_content,
-                        "context": {
-                            "conversation_id": "code_review_session",
-                            "user_id": "github_actions"
-                        }
-                    }
-                ]
-            },
-            # Format 2: dataframe_records with minimal context
-            {
-                "dataframe_records": [
-                    {
-                        "input": diff_content,
-                        "context": {}
-                    }
-                ]
-            },
-            # Format 3: instances format
-            {
-                "instances": [
-                    {
-                        "input": diff_content,
-                        "context": {
-                            "conversation_id": "code_review_session",
-                            "user_id": "github_actions"
-                        }
-                    }
-                ]
-            },
-            # Format 4: inputs format
-            {
-                "inputs": [
-                    {
-                        "input": diff_content,
-                        "context": {
-                            "conversation_id": "code_review_session",
-                            "user_id": "github_actions"
-                        }
-                    }
-                ]
-            },
-            # Format 5: dataframe_split format
-            {
-                "dataframe_split": {
-                    "data": [
-                        {
-                            "input": diff_content,
-                            "context": {
-                                "conversation_id": "code_review_session",
-                                "user_id": "github_actions"
-                            }
-                        }
-                    ]
+        # Create the correct dataframe_split format
+        try:
+            # Create a simple data structure that can be converted to dataframe_split format
+            data = {
+                'messages': [diff_content],
+                'context': {
+                    'conversation_id': 'code_review_session',
+                    'user_id': 'github_actions'
                 }
             }
-        ]
-        
-        for i, payload in enumerate(payload_formats, 1):
-            try:
-                serialized_payload = json.dumps(payload, ensure_ascii=False)
-                print(f"📤 Attempt {i}: Sending payload to Databricks API:")
-                print(f"   URL: {url}")
-                print(f"   Payload format: {list(payload.keys())}")
-                print(f"   Payload size: {len(serialized_payload)} characters")
+            
+            # Convert to dataframe_split format
+            ds_dict = {
+                'dataframe_split': {
+                    'data': [data]
+                }
+            }
+            
+            # Serialize with allow_nan=True as in the working example
+            data_json = json.dumps(ds_dict, allow_nan=True, ensure_ascii=False)
+            
+            print(f"📤 Sending payload to Databricks API:")
+            print(f"   URL: {url}")
+            print(f"   Payload format: dataframe_split")
+            print(f"   Payload size: {len(data_json)} characters")
+            
+            response = requests.post(url, headers=headers, data=data_json, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Successfully received AI code review")
+                print(f"   Response size: {len(response.text)} characters")
+                return result
+            else:
+                print(f"❌ Error calling Databricks endpoint: {response.status_code}")
+                print(f"Response: {response.text}")
+                return None
                 
-                response = requests.post(url, headers=headers, data=serialized_payload, timeout=30)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    print(f"✅ Successfully received AI code review (format {i})")
-                    print(f"   Response size: {len(response.text)} characters")
-                    return result
-                else:
-                    print(f"❌ Format {i} failed: {response.status_code}")
-                    print(f"Response: {response.text}")
-                    if i < len(payload_formats):
-                        print(f"   Trying next format...")
-                    continue
-                    
-            except json.JSONDecodeError as e:
-                print(f"❌ JSON serialization error (format {i}): {e}")
-                continue
-            except Exception as e:
-                print(f"❌ Exception calling Databricks endpoint (format {i}): {e}")
-                continue
-        
-        print("❌ All payload formats failed")
-        return None
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON serialization error: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ Exception calling Databricks endpoint: {e}")
+            return None
     
     def create_pr_comment(self, ai_review: Dict, diff_content: str, commit_info: Dict[str, str]) -> str:
         """
