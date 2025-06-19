@@ -9,6 +9,7 @@ import sys
 import json
 import subprocess
 import argparse
+import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -99,6 +100,100 @@ class DiffGenerator:
             return "No statistics available (possibly initial commit)"
         
         return stats
+    
+    def call_databricks_api(self, diff_content: str) -> Optional[Dict]:
+        """
+        Call Databricks model serving endpoint for code review.
+        
+        Args:
+            diff_content: The git diff content to analyze
+            
+        Returns:
+            API response as dictionary or None if failed
+        """
+        url = "https://dbc-477bce68-f9e4.cloud.databricks.com/serving-endpoints/agents_workspace-default-secureguard/invocations"
+        token = os.environ.get('DATABRICKS_TOKEN')
+        
+        if not token:
+            print("❌ DATABRICKS_TOKEN not found in environment variables")
+            print("Please set the DATABRICKS_TOKEN environment variable or GitHub secret")
+            return None
+        
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Prepare payload with messages array
+        payload = {
+            "messages": [diff_content]
+        }
+        
+        try:
+            print(f"🔍 Calling Databricks endpoint for code review...")
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Successfully received AI code review")
+                return result
+            else:
+                print(f"❌ Error calling Databricks endpoint: {response.status_code}")
+                print(f"Response: {response.text}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Exception calling Databricks endpoint: {e}")
+            return None
+    
+    def create_pr_comment(self, ai_review: Dict, diff_content: str, commit_info: Dict[str, str]) -> str:
+        """
+        Create a PR comment with the AI review results.
+        
+        Args:
+            ai_review: The response from Databricks API
+            diff_content: The original diff content
+            commit_info: Commit information dictionary
+            
+        Returns:
+            Formatted comment text
+        """
+        # Extract AI review content
+        ai_content = ""
+        if isinstance(ai_review, dict):
+            # Try to extract the review content from the response
+            if 'predictions' in ai_review:
+                ai_content = str(ai_review['predictions'])
+            elif 'response' in ai_review:
+                ai_content = str(ai_review['response'])
+            else:
+                ai_content = str(ai_review)
+        else:
+            ai_content = str(ai_review)
+        
+        # Create the comment
+        comment = f"""## 🤖 AI Code Review - Databricks SecureGuard
+
+### Review Summary
+**Previous Commit:** `{commit_info['previous_commit'][:8]}`
+**Current Commit:** `{commit_info['current_commit'][:8]}`
+**Context Lines:** ±{self.context_lines}
+**Review Source:** Databricks Model Serving Endpoint
+
+### AI Analysis
+```
+{ai_content}
+```
+
+### Original Diff
+```diff
+{diff_content[:2000]}{'...' if len(diff_content) > 2000 else ''}
+```
+
+---
+*AI analysis provided by Databricks SecureGuard AI*"""
+        
+        return comment
     
     def create_markdown_summary(self, commit_info: Dict[str, str], diff_content: str, stats: str) -> str:
         """Create a formatted markdown summary."""
@@ -226,11 +321,39 @@ class DiffGenerator:
         # Save files
         self.save_files(diff_content, markdown_summary, json_report)
         
+        # Call Databricks API for AI review
+        ai_review = self.call_databricks_api(diff_content)
+        if ai_review:
+            # Create PR comment
+            pr_comment = self.create_pr_comment(ai_review, diff_content, commit_info)
+            
+            # Save AI review and comment
+            ai_review_file = self.output_dir / "ai_review.json"
+            with open(ai_review_file, 'w', encoding='utf-8') as f:
+                json.dump(ai_review, f, indent=2, ensure_ascii=False)
+            
+            pr_comment_file = self.output_dir / "pr_comment.md"
+            with open(pr_comment_file, 'w', encoding='utf-8') as f:
+                f.write(pr_comment)
+            
+            print(f"  - {ai_review_file}")
+            print(f"  - {pr_comment_file}")
+            
+            # Add AI review to JSON report
+            json_report["ai_review"] = ai_review
+            json_report["pr_comment"] = pr_comment
+            
+            # Update JSON file with AI review
+            with open(self.output_dir / "diff_report.json", 'w', encoding='utf-8') as f:
+                json.dump(json_report, f, indent=2, ensure_ascii=False)
+        
         # Print summary
         diff_lines = len(diff_content.split('\n'))
         print(f"📊 Diff analysis complete!")
         print(f"   Total diff lines: {diff_lines}")
         print(f"   Context lines: ±{self.context_lines}")
+        if ai_review:
+            print(f"   AI review: ✅ Generated")
         
         return json_report
 

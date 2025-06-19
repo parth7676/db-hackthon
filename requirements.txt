@@ -2,6 +2,9 @@
 # No external dependencies required - uses only standard library modules
 # This file is included for future extensibility
 
+# External dependencies
+requests>=2.31.0  # For HTTP API calls to Databricks endpoint
+
 # Standard library modules used:
 # - os
 # - sys
