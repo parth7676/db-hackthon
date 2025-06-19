@@ -272,20 +272,99 @@ class DiffGenerator:
         
         # Add location if found
         if "Location:" in ai_content:
-            location_match = None
+            formatted_parts.append("### 📍 Location")
+            location_info = []
             for line in ai_content.split('\n'):
-                if "File:" in line or "Line:" in line:
-                    location_match = line.strip()
+                if "File:" in line:
+                    location_info.append(line.strip())
+                elif "Line:" in line:
+                    location_info.append(line.strip())
+                elif "Function/Method:" in line:
+                    location_info.append(line.strip())
+            
+            if location_info:
+                for info in location_info:
+                    formatted_parts.append(f"- {info}")
+            formatted_parts.append("")
+        
+        # Add vulnerability description if found
+        if "Vulnerability Description:" in ai_content:
+            formatted_parts.append("### 🔍 Issue Description")
+            desc_lines = []
+            in_desc = False
+            for line in ai_content.split('\n'):
+                if "Vulnerability Description:" in line:
+                    in_desc = True
+                    continue
+                elif in_desc and line.strip().startswith('###'):
                     break
-            if location_match:
-                formatted_parts.append(f"**Location:** {location_match}")
-                formatted_parts.append("")
+                elif in_desc and line.strip():
+                    desc_lines.append(line.strip())
+            
+            if desc_lines:
+                # Take the first meaningful description line
+                for line in desc_lines:
+                    if len(line) > 20:  # Skip very short lines
+                        formatted_parts.append(line)
+                        break
+            formatted_parts.append("")
+        
+        # Add CWE reference if found
+        if "CWE Reference:" in ai_content:
+            formatted_parts.append("### 🏷️ CWE Reference")
+            cwe_info = []
+            for line in ai_content.split('\n'):
+                if "CWE-ID:" in line:
+                    cwe_info.append(line.strip())
+                elif "Category:" in line:
+                    cwe_info.append(line.strip())
+            
+            if cwe_info:
+                for info in cwe_info:
+                    formatted_parts.append(f"- {info}")
+            formatted_parts.append("")
         
         # Add risk assessment if found
         if "Risk Assessment:" in ai_content:
             formatted_parts.append("### ⚠️ Risk Assessment")
-            formatted_parts.append("- **Impact:** High - Potential access to sensitive files")
-            formatted_parts.append("- **Exploitability:** High - Easily exploitable with crafted input")
+            risk_info = []
+            for line in ai_content.split('\n'):
+                if "Severity:" in line:
+                    risk_info.append(f"**{line.strip()}")
+                elif "Impact:" in line:
+                    risk_info.append(f"**{line.strip()}")
+                elif "Likelihood:" in line:
+                    risk_info.append(f"**{line.strip()}")
+            
+            if risk_info:
+                for info in risk_info:
+                    formatted_parts.append(f"- {info}")
+            else:
+                formatted_parts.append("- **Severity:** High")
+                formatted_parts.append("- **Impact:** High - Potential access to sensitive files")
+                formatted_parts.append("- **Likelihood:** High - Easily exploitable with crafted input")
+            formatted_parts.append("")
+        
+        # Add attack scenario if found
+        if "Attack Scenario:" in ai_content:
+            formatted_parts.append("### 🎯 Attack Scenario")
+            scenario_lines = []
+            in_scenario = False
+            for line in ai_content.split('\n'):
+                if "Attack Scenario:" in line:
+                    in_scenario = True
+                    continue
+                elif in_scenario and line.strip().startswith('###'):
+                    break
+                elif in_scenario and line.strip():
+                    scenario_lines.append(line.strip())
+            
+            if scenario_lines:
+                # Take the first meaningful scenario line
+                for line in scenario_lines:
+                    if len(line) > 30:  # Skip very short lines
+                        formatted_parts.append(line)
+                        break
             formatted_parts.append("")
         
         # Add vulnerable code snippet if found
@@ -316,7 +395,7 @@ class DiffGenerator:
         
         # Add recommendations if found
         if "Recommendations:" in ai_content:
-            formatted_parts.append("### 💡 Recommendations")
+            formatted_parts.append("### 💡 Key Recommendations")
             recommendations = []
             in_recommendations = False
             for line in ai_content.split('\n'):
@@ -335,6 +414,25 @@ class DiffGenerator:
                 formatted_parts.append("- Validate user input to prevent directory traversal")
                 formatted_parts.append("- Use `os.path.join` for secure path construction")
                 formatted_parts.append("- Check file existence before reading")
+            formatted_parts.append("")
+        
+        # Add additional recommendations if found
+        if "Additional Recommendations:" in ai_content:
+            formatted_parts.append("### 🛡️ Additional Security Measures")
+            additional_recs = []
+            in_additional = False
+            for line in ai_content.split('\n'):
+                if "Additional Recommendations:" in line:
+                    in_additional = True
+                    continue
+                elif in_additional and line.strip().startswith('###'):
+                    break
+                elif in_additional and line.strip().startswith('-'):
+                    additional_recs.append(line.strip())
+            
+            if additional_recs:
+                for rec in additional_recs[:3]:  # Limit to first 3 additional recommendations
+                    formatted_parts.append(f"- {rec}")
             formatted_parts.append("")
         
         # If no structured content found, provide a simplified version
