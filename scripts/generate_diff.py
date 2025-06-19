@@ -124,28 +124,66 @@ class DiffGenerator:
             'Content-Type': 'application/json'
         }
         
-        # Try different payload formats for Databricks compatibility
+        # Try different payload formats based on error messages
         payload_formats = [
-            # Format 1: Simple messages array
-            {
-                "messages": [diff_content]
-            },
-            # Format 2: Dataframe records format (common for Databricks)
+            # Format 1: dataframe_records with proper context structure
             {
                 "dataframe_records": [
                     {
                         "input": diff_content,
-                        "context": "code_review"
+                        "context": {
+                            "conversation_id": "code_review_session",
+                            "user_id": "github_actions"
+                        }
                     }
                 ]
             },
-            # Format 3: Direct input format
+            # Format 2: dataframe_records with minimal context
             {
-                "input": diff_content
+                "dataframe_records": [
+                    {
+                        "input": diff_content,
+                        "context": {}
+                    }
+                ]
             },
-            # Format 4: Text format
+            # Format 3: instances format
             {
-                "text": diff_content
+                "instances": [
+                    {
+                        "input": diff_content,
+                        "context": {
+                            "conversation_id": "code_review_session",
+                            "user_id": "github_actions"
+                        }
+                    }
+                ]
+            },
+            # Format 4: inputs format
+            {
+                "inputs": [
+                    {
+                        "input": diff_content,
+                        "context": {
+                            "conversation_id": "code_review_session",
+                            "user_id": "github_actions"
+                        }
+                    }
+                ]
+            },
+            # Format 5: dataframe_split format
+            {
+                "dataframe_split": {
+                    "data": [
+                        {
+                            "input": diff_content,
+                            "context": {
+                                "conversation_id": "code_review_session",
+                                "user_id": "github_actions"
+                            }
+                        }
+                    ]
+                }
             }
         ]
         
