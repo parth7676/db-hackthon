@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  generate-diff:
+  secure-guard-on-duty :
     runs-on: ubuntu-latest
     
     steps:
