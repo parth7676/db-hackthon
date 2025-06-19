@@ -1,4 +1,4 @@
-name: Code Diff Analysis
+name: SecureGuard
 
 on:
   push:
@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  secure-guard-on-duty :
+  code-inspection :
     runs-on: ubuntu-latest
     
     steps:
