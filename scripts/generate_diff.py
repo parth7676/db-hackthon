@@ -226,7 +226,7 @@ class DiffGenerator:
     
     def _format_ai_review(self, ai_content: str) -> str:
         """
-        Format the AI review content to be more readable and developer-friendly.
+        Format the AI review content to be simple, readable and developer-friendly.
         
         Args:
             ai_content: Raw AI review content
@@ -237,227 +237,121 @@ class DiffGenerator:
         if not ai_content:
             return "❌ No AI review content available"
         
-        # Extract key sections from the AI response
-        sections = {}
-        
-        # Look for vulnerability information
-        if "## 🔴" in ai_content or "Vulnerability" in ai_content:
-            # Extract vulnerability details
-            lines = ai_content.split('\n')
-            current_section = ""
-            current_content = []
-            
-            for line in lines:
-                if line.startswith('## 🔴') or line.startswith('### **'):
-                    if current_section and current_content:
-                        sections[current_section] = '\n'.join(current_content).strip()
-                    current_section = line.strip('#* ')
-                    current_content = []
-                elif line.strip() and current_section:
-                    current_content.append(line)
-            
-            if current_section and current_content:
-                sections[current_section] = '\n'.join(current_content).strip()
-        
-        # Create a simplified, developer-friendly format
+        # Simple, clean formatting
         formatted_parts = []
         
-        # Add vulnerability summary if found
+        # Extract basic vulnerability info
         if "Path Traversal Vulnerability" in ai_content:
-            formatted_parts.append("### 🚨 Security Issue Detected")
-            formatted_parts.append("**Type:** Path Traversal Vulnerability")
-            formatted_parts.append("**Severity:** High")
-            formatted_parts.append("**CWE:** CWE-23")
+            formatted_parts.append("## 🚨 Security Issue: Path Traversal")
             formatted_parts.append("")
         
-        # Add location if found
-        if "Location:" in ai_content:
-            formatted_parts.append("### 📍 Location")
-            location_info = []
-            for line in ai_content.split('\n'):
-                if "File:" in line:
-                    location_info.append(line.strip())
-                elif "Line:" in line:
-                    location_info.append(line.strip())
-                elif "Function/Method:" in line:
-                    location_info.append(line.strip())
-            
-            if location_info:
-                for info in location_info:
-                    formatted_parts.append(f"- {info}")
+        # Extract location
+        location = ""
+        for line in ai_content.split('\n'):
+            if "File:" in line:
+                location = line.replace("File:", "").strip()
+                break
+        
+        if location:
+            formatted_parts.append(f"**File:** {location}")
+        
+        # Extract severity
+        severity = "High"
+        for line in ai_content.split('\n'):
+            if "Severity:" in line:
+                severity = line.replace("Severity:", "").strip()
+                break
+        
+        formatted_parts.append(f"**Severity:** {severity}")
+        formatted_parts.append("")
+        
+        # Extract CWE
+        cwe = ""
+        for line in ai_content.split('\n'):
+            if "CWE-ID:" in line:
+                cwe = line.replace("CWE-ID:", "").strip()
+                break
+        
+        if cwe:
+            formatted_parts.append(f"**CWE:** {cwe}")
             formatted_parts.append("")
         
-        # Add vulnerability description if found
-        if "Vulnerability Description:" in ai_content:
-            formatted_parts.append("### 🔍 Issue Description")
-            desc_lines = []
-            in_desc = False
-            for line in ai_content.split('\n'):
-                if "Vulnerability Description:" in line:
-                    in_desc = True
-                    continue
-                elif in_desc and line.strip().startswith('###'):
-                    break
-                elif in_desc and line.strip():
-                    desc_lines.append(line.strip())
-            
-            if desc_lines:
-                # Take the first meaningful description line
-                for line in desc_lines:
-                    if len(line) > 20:  # Skip very short lines
-                        formatted_parts.append(line)
+        # Extract description (first meaningful paragraph)
+        description = ""
+        lines = ai_content.split('\n')
+        for i, line in enumerate(lines):
+            if "Vulnerability Description:" in line:
+                # Get the next meaningful line
+                for j in range(i + 1, len(lines)):
+                    if lines[j].strip() and not lines[j].strip().startswith('###'):
+                        description = lines[j].strip()
                         break
+                break
+        
+        if description:
+            formatted_parts.append("**Issue:** " + description)
             formatted_parts.append("")
         
-        # Add CWE reference if found
-        if "CWE Reference:" in ai_content:
-            formatted_parts.append("### 🏷️ CWE Reference")
-            cwe_info = []
-            for line in ai_content.split('\n'):
-                if "CWE-ID:" in line:
-                    cwe_info.append(line.strip())
-                elif "Category:" in line:
-                    cwe_info.append(line.strip())
-            
-            if cwe_info:
-                for info in cwe_info:
-                    formatted_parts.append(f"- {info}")
+        # Extract vulnerable code
+        vulnerable_code = ""
+        start_idx = ai_content.find("```python")
+        if start_idx != -1:
+            end_idx = ai_content.find("```", start_idx + 9)
+            if end_idx != -1:
+                vulnerable_code = ai_content[start_idx:end_idx + 3]
+        
+        if vulnerable_code:
+            formatted_parts.append("**Vulnerable Code:**")
+            formatted_parts.append(vulnerable_code)
             formatted_parts.append("")
         
-        # Add risk assessment if found
-        if "Risk Assessment:" in ai_content:
-            formatted_parts.append("### ⚠️ Risk Assessment")
-            risk_info = []
-            for line in ai_content.split('\n'):
-                if "Severity:" in line:
-                    risk_info.append(f"**{line.strip()}")
-                elif "Impact:" in line:
-                    risk_info.append(f"**{line.strip()}")
-                elif "Likelihood:" in line:
-                    risk_info.append(f"**{line.strip()}")
-            
-            if risk_info:
-                for info in risk_info:
-                    formatted_parts.append(f"- {info}")
-            else:
-                formatted_parts.append("- **Severity:** High")
-                formatted_parts.append("- **Impact:** High - Potential access to sensitive files")
-                formatted_parts.append("- **Likelihood:** High - Easily exploitable with crafted input")
-            formatted_parts.append("")
-        
-        # Add attack scenario if found
-        if "Attack Scenario:" in ai_content:
-            formatted_parts.append("### 🎯 Attack Scenario")
-            scenario_lines = []
-            in_scenario = False
-            for line in ai_content.split('\n'):
-                if "Attack Scenario:" in line:
-                    in_scenario = True
-                    continue
-                elif in_scenario and line.strip().startswith('###'):
-                    break
-                elif in_scenario and line.strip():
-                    scenario_lines.append(line.strip())
-            
-            if scenario_lines:
-                # Take the first meaningful scenario line
-                for line in scenario_lines:
-                    if len(line) > 30:  # Skip very short lines
-                        formatted_parts.append(line)
-                        break
-            formatted_parts.append("")
-        
-        # Add vulnerable code snippet if found
-        if "Vulnerable Code:" in ai_content:
-            formatted_parts.append("### 🔴 Vulnerable Code")
-            # Extract the code block
-            start_idx = ai_content.find("```python")
+        # Extract secure code
+        secure_code = ""
+        secure_start = ai_content.find("Secure Code:")
+        if secure_start != -1:
+            start_idx = ai_content.find("```python", secure_start)
             if start_idx != -1:
                 end_idx = ai_content.find("```", start_idx + 9)
                 if end_idx != -1:
-                    vulnerable_code = ai_content[start_idx:end_idx + 3]
-                    formatted_parts.append(vulnerable_code)
-                    formatted_parts.append("")
+                    secure_code = ai_content[start_idx:end_idx + 3]
         
-        # Add secure code snippet if found
-        if "Secure Code:" in ai_content:
-            formatted_parts.append("### ✅ Secure Code")
-            # Extract the code block
-            start_idx = ai_content.find("Secure Code:", ai_content.find("Secure Code:"))
-            if start_idx != -1:
-                start_idx = ai_content.find("```python", start_idx)
-                if start_idx != -1:
-                    end_idx = ai_content.find("```", start_idx + 9)
-                    if end_idx != -1:
-                        secure_code = ai_content[start_idx:end_idx + 3]
-                        formatted_parts.append(secure_code)
-                        formatted_parts.append("")
-        
-        # Add recommendations if found
-        if "Recommendations:" in ai_content:
-            formatted_parts.append("### 💡 Key Recommendations")
-            recommendations = []
-            in_recommendations = False
-            for line in ai_content.split('\n'):
-                if "Recommendations:" in line:
-                    in_recommendations = True
-                    continue
-                elif in_recommendations and line.strip().startswith('###'):
-                    break
-                elif in_recommendations and line.strip().startswith('1.') or line.strip().startswith('-'):
-                    recommendations.append(line.strip())
-            
-            if recommendations:
-                for rec in recommendations[:5]:  # Limit to first 5 recommendations
-                    formatted_parts.append(f"- {rec}")
-            else:
-                formatted_parts.append("- Validate user input to prevent directory traversal")
-                formatted_parts.append("- Use `os.path.join` for secure path construction")
-                formatted_parts.append("- Check file existence before reading")
+        if secure_code:
+            formatted_parts.append("**Secure Code:**")
+            formatted_parts.append(secure_code)
             formatted_parts.append("")
         
-        # Add additional recommendations if found
-        if "Additional Recommendations:" in ai_content:
-            formatted_parts.append("### 🛡️ Additional Security Measures")
-            additional_recs = []
-            in_additional = False
-            for line in ai_content.split('\n'):
-                if "Additional Recommendations:" in line:
-                    in_additional = True
-                    continue
-                elif in_additional and line.strip().startswith('###'):
-                    break
-                elif in_additional and line.strip().startswith('-'):
-                    additional_recs.append(line.strip())
-            
-            if additional_recs:
-                for rec in additional_recs[:3]:  # Limit to first 3 additional recommendations
-                    formatted_parts.append(f"- {rec}")
+        # Extract key recommendations
+        recommendations = []
+        in_recs = False
+        for line in ai_content.split('\n'):
+            if "Recommendations:" in line:
+                in_recs = True
+                continue
+            elif in_recs and line.strip().startswith('###'):
+                break
+            elif in_recs and line.strip().startswith('1.') or line.strip().startswith('-'):
+                rec = line.strip()
+                if rec.startswith('1.'):
+                    rec = rec[2:].strip()
+                elif rec.startswith('-'):
+                    rec = rec[1:].strip()
+                if rec and len(rec) > 10:
+                    recommendations.append(rec)
+        
+        if recommendations:
+            formatted_parts.append("**Key Fixes:**")
+            for i, rec in enumerate(recommendations[:3], 1):  # Limit to 3
+                formatted_parts.append(f"{i}. {rec}")
             formatted_parts.append("")
         
-        # If no structured content found, provide a simplified version
-        if not formatted_parts:
-            # Extract the main content without the verbose sections
-            lines = ai_content.split('\n')
-            simplified_lines = []
-            skip_section = False
-            
-            for line in lines:
-                if line.startswith('### **Vector DB Context:'):
-                    skip_section = True
-                    continue
-                elif line.startswith('### **') and skip_section:
-                    skip_section = False
-                
-                if not skip_section and line.strip():
-                    simplified_lines.append(line)
-            
-            if simplified_lines:
-                formatted_parts.append("### 📋 AI Security Analysis")
-                formatted_parts.append('\n'.join(simplified_lines[:20]))  # Limit to first 20 lines
-            else:
-                formatted_parts.append("### 📋 AI Security Analysis")
-                formatted_parts.append("AI analysis completed. Review the code changes for security best practices.")
+        # If no structured content found, provide a simple summary
+        if len(formatted_parts) <= 3:
+            formatted_parts = []
+            formatted_parts.append("## 🔍 AI Security Review")
+            formatted_parts.append("")
+            formatted_parts.append("The AI has analyzed your code changes and identified potential security considerations.")
+            formatted_parts.append("")
+            formatted_parts.append("**Recommendation:** Review the changes for security best practices and ensure proper input validation.")
         
         return '\n'.join(formatted_parts)
     
