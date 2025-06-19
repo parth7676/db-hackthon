@@ -35,17 +35,29 @@ class DiffGenerator:
             print(f"Error: {e.stderr}")
             return e.stderr, e.returncode
     
+    def check_commit_exists(self, commit_ref: str) -> bool:
+        """Check if a commit reference exists."""
+        _, return_code = self.run_git_command(["git", "rev-parse", "--verify", commit_ref])
+        return return_code == 0
+    
     def get_commit_info(self) -> Dict[str, str]:
         """Get information about current and previous commits."""
         # Get current commit
         current_commit, _ = self.run_git_command(["git", "rev-parse", "HEAD"])
         
-        # Get previous commit
-        prev_commit, _ = self.run_git_command(["git", "rev-parse", "HEAD~1"])
-        
-        # Get commit messages
-        current_msg, _ = self.run_git_command(["git", "log", "-1", "--pretty=format:%s"])
-        prev_msg, _ = self.run_git_command(["git", "log", "-1", "--pretty=format:%s", "HEAD~1"])
+        # Check if previous commit exists
+        if self.check_commit_exists("HEAD~1"):
+            # Get previous commit
+            prev_commit, _ = self.run_git_command(["git", "rev-parse", "HEAD~1"])
+            
+            # Get commit messages
+            current_msg, _ = self.run_git_command(["git", "log", "-1", "--pretty=format:%s"])
+            prev_msg, _ = self.run_git_command(["git", "log", "-1", "--pretty=format:%s", "HEAD~1"])
+        else:
+            # Only one commit exists - use empty tree as previous
+            prev_commit = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # Git empty tree
+            current_msg, _ = self.run_git_command(["git", "log", "-1", "--pretty=format:%s"])
+            prev_msg = "Initial commit (empty tree)"
         
         # Get author info
         author, _ = self.run_git_command(["git", "log", "-1", "--pretty=format:%an"])
@@ -56,7 +68,8 @@ class DiffGenerator:
             "current_message": current_msg,
             "previous_message": prev_msg,
             "author": author,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "is_initial_commit": not self.check_commit_exists("HEAD~1")
         }
     
     def generate_diff(self, prev_commit: str, current_commit: str) -> str:
@@ -72,17 +85,27 @@ class DiffGenerator:
         
         if return_code != 0:
             print(f"Warning: Git diff returned code {return_code}")
+            if "fatal: ambiguous argument" in diff_output:
+                print("This might be the first commit in the repository.")
         
         return diff_output
     
     def get_changed_files_stats(self, prev_commit: str, current_commit: str) -> str:
         """Get statistics about changed files."""
         stat_cmd = ["git", "diff", "--stat", prev_commit, current_commit]
-        stats, _ = self.run_git_command(stat_cmd)
+        stats, return_code = self.run_git_command(stat_cmd)
+        
+        if return_code != 0:
+            return "No statistics available (possibly initial commit)"
+        
         return stats
     
     def create_markdown_summary(self, commit_info: Dict[str, str], diff_content: str, stats: str) -> str:
         """Create a formatted markdown summary."""
+        initial_commit_note = ""
+        if commit_info.get("is_initial_commit", False):
+            initial_commit_note = "\n> **Note:** This appears to be the initial commit in the repository."
+        
         summary = f"""# Code Diff Summary
 
 ## Commit Information
@@ -90,7 +113,7 @@ class DiffGenerator:
 - **Current Commit:** `{commit_info['current_commit'][:8]}`
 - **Author:** {commit_info['author']}
 - **Context Lines:** ±{self.context_lines}
-- **Timestamp:** {commit_info['timestamp']}
+- **Timestamp:** {commit_info['timestamp']}{initial_commit_note}
 
 ## Commit Messages
 - **Previous:** {commit_info['previous_message']}
@@ -125,7 +148,8 @@ class DiffGenerator:
                 "generator": "Python Diff Generator",
                 "version": "1.0.0",
                 "timestamp": commit_info['timestamp'],
-                "context_lines": self.context_lines
+                "context_lines": self.context_lines,
+                "is_initial_commit": commit_info.get("is_initial_commit", False)
             },
             "commits": {
                 "previous": {
@@ -179,6 +203,9 @@ class DiffGenerator:
         commit_info = self.get_commit_info()
         print(f"📝 Previous commit: {commit_info['previous_commit'][:8]}")
         print(f"📝 Current commit: {commit_info['current_commit'][:8]}")
+        
+        if commit_info.get("is_initial_commit", False):
+            print("ℹ️  This appears to be the initial commit - comparing against empty tree")
         
         # Generate diff
         diff_content = self.generate_diff(
