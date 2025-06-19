@@ -124,11 +124,16 @@ class DiffGenerator:
             'Content-Type': 'application/json'
         }
         
-        # Create the correct dataframe_split format
+        # Create the correct dataframe_split format with proper message structure
         try:
-            # Create a simple data structure that can be converted to dataframe_split format
+            # Create a data structure with proper message objects
             data = {
-                'messages': [diff_content],
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': diff_content
+                    }
+                ],
                 'context': {
                     'conversation_id': 'code_review_session',
                     'user_id': 'github_actions'
@@ -148,6 +153,7 @@ class DiffGenerator:
             print(f"📤 Sending payload to Databricks API:")
             print(f"   URL: {url}")
             print(f"   Payload format: dataframe_split")
+            print(f"   Messages count: {len(data['messages'])}")
             print(f"   Payload size: {len(data_json)} characters")
             
             response = requests.post(url, headers=headers, data=data_json, timeout=30)
