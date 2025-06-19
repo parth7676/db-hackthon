@@ -13,6 +13,12 @@ on:
         default: '10'
         type: string
 
+# Add permissions for commenting on issues/PRs
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   generate-diff:
     runs-on: ubuntu-latest
@@ -148,12 +154,12 @@ jobs:
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "## 🤖 AI Code Review" >> $GITHUB_STEP_SUMMARY
+        echo "## �� AI Code Review" >> $GITHUB_STEP_SUMMARY
         echo "- **AI Review Generated:** ${{ steps.diff_analysis.outputs.has_ai_review }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Review Source:** Databricks SecureGuard AI" >> $GITHUB_STEP_SUMMARY
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📁 **Artifacts:** All diff files and AI reviews have been uploaded as artifacts." >> $GITHUB_STEP_SUMMARY
+        echo "�� **Artifacts:** All diff files and AI reviews have been uploaded as artifacts." >> $GITHUB_STEP_SUMMARY
     
     - name: Output final summary
       run: |
