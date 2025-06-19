@@ -1,0 +1,18 @@
+# Python Diff Generator Dependencies
+# No external dependencies required - uses only standard library modules
+# This file is included for future extensibility
+
+# Standard library modules used:
+# - os
+# - sys
+# - json
+# - subprocess
+# - argparse
+# - datetime
+# - pathlib
+# - typing
+
+# Future potential dependencies:
+# - gitpython>=3.1.0  # For more advanced git operations
+# - colorama>=0.4.0   # For colored output
+# - rich>=13.0.0      # For rich terminal output 

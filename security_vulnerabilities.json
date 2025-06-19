@@ -1,0 +1,254 @@
+{
+  "vulnerabilities": [
+    {
+      "id": 1,
+      "attack_type": "Path Traversal",
+      "cve": "CVE-2021-44228",
+      "attack_description": "Path traversal vulnerability allows access to files outside intended directory",
+      "bad_code": "import os\n# Vulnerable: Direct path usage without validation\nfile_path = request.args.get('file')\nwith open(file_path, 'r') as f:\n    content = f.read()",
+      "good_code": "import os\n# Secure: Validate and normalize paths\ndef safe_file_read(filename):\n    # Normalize path and check for directory traversal\n    normalized_path = os.path.normpath(filename)\n    if normalized_path.startswith('..') or '/' in normalized_path:\n        raise ValueError(\"Invalid file path\")\n    safe_dir = \"/safe/directory/\"\n    full_path = os.path.join(safe_dir, normalized_path)\n    if not full_path.startswith(safe_dir):\n        raise ValueError(\"Path traversal detected\")\n    with open(full_path, 'r') as f:\n        return f.read()"
+    },
+    {
+      "id": 2,
+      "attack_type": "Improper Certificate Validation",
+      "cve": "CVE-2021-34527",
+      "attack_description": "SSL/TLS certificate validation bypass allows man-in-the-middle attacks",
+      "bad_code": "import requests\n# Vulnerable: Disable SSL verification\nresponse = requests.get('https://api.example.com', verify=False)",
+      "good_code": "import requests\nimport ssl\n# Secure: Proper certificate validation\nresponse = requests.get('https://api.example.com', verify=True)\n# Or for custom certificates:\nsession = requests.Session()\nsession.verify = '/path/to/certificate.pem'\nresponse = session.get('https://api.example.com')"
+    },
+    {
+      "id": 3,
+      "attack_type": "SQL Injection",
+      "cve": "CVE-2017-5645",
+      "attack_description": "SQL injection vulnerability allows unauthorized database access",
+      "bad_code": "import sqlite3\n# Vulnerable: Direct string concatenation\nquery = f\"SELECT * FROM users WHERE id = {user_id}\"\ncursor.execute(query)",
+      "good_code": "import sqlite3\n# Secure: Use parameterized queries\nquery = \"SELECT * FROM users WHERE id = ?\"\ncursor.execute(query, (user_id,))\n# Or with named parameters:\nquery = \"SELECT * FROM users WHERE id = :user_id\"\ncursor.execute(query, {\"user_id\": user_id})"
+    },
+    {
+      "id": 4,
+      "attack_type": "Use of Hardcoded Passwords",
+      "cve": "CVE-2019-0232",
+      "attack_description": "Hardcoded passwords in source code expose credentials",
+      "bad_code": "import requests\n# Vulnerable: Hardcoded password\npassword = \"admin123\"\nresponse = requests.post('https://api.example.com/login', \n                        data={'username': 'admin', 'password': password})",
+      "good_code": "import os\nimport requests\n# Secure: Use environment variables\npassword = os.environ.get('DB_PASSWORD')\nif not password:\n    raise ValueError(\"Database password not configured\")\nresponse = requests.post('https://api.example.com/login', \n                        data={'username': 'admin', 'password': password})"
+    },
+    {
+      "id": 5,
+      "attack_type": "Command Injection",
+      "cve": "CVE-2020-7662",
+      "attack_description": "Command injection allows execution of arbitrary system commands",
+      "bad_code": "import subprocess\n# Vulnerable: Direct command execution\ncommand = f\"ping {user_input}\"\nsubprocess.run(command, shell=True)",
+      "good_code": "import subprocess\nimport shlex\n# Secure: Use subprocess with validation\ndef safe_ping(host):\n    if not re.match(r'^[a-zA-Z0-9\\.\\-]+$', host):\n        raise ValueError(\"Invalid hostname\")\n    args = ['ping', '-c', '1', host]\n    subprocess.run(args, shell=False)"
+    },
+    {
+      "id": 6,
+      "attack_type": "Server-Side Request Forgery (SSRF)",
+      "cve": "CVE-2019-0708",
+      "attack_description": "SSRF allows attackers to make requests to internal services",
+      "bad_code": "import requests\n# Vulnerable: Direct URL usage\nurl = request.args.get('url')\nresponse = requests.get(url)",
+      "good_code": "import requests\nfrom urllib.parse import urlparse\n# Secure: Validate URLs and restrict access\ndef safe_request(url):\n    parsed = urlparse(url)\n    # Block internal IPs and localhost\n    blocked_hosts = ['localhost', '127.0.0.1', '10.0.0.0/8', '192.168.0.0/16']\n    if parsed.hostname in blocked_hosts:\n        raise ValueError(\"Access to internal services blocked\")\n    response = requests.get(url, timeout=5)\n    return response"
+    },
+    {
+      "id": 7,
+      "attack_type": "Insecure Xml Parser",
+      "cve": "CVE-2020-1472",
+      "attack_description": "XML external entity injection allows access to local files",
+      "bad_code": "import xml.etree.ElementTree as ET\n# Vulnerable: Direct XML parsing\ntree = ET.parse('data.xml')\nroot = tree.getroot()",
+      "good_code": "import xml.etree.ElementTree as ET\n# Secure: Disable external entity processing\ndef safe_xml_parse(xml_data):\n    parser = ET.XMLParser(target=ET.TreeBuilder())\n    # Disable entity processing\n    parser.entity = lambda x, y, z: None\n    root = ET.fromstring(xml_data, parser=parser)\n    return root"
+    },
+    {
+      "id": 8,
+      "attack_type": "Use of Hardcoded Credentials",
+      "cve": "CVE-2021-26855",
+      "attack_description": "Hardcoded API keys and tokens in source code",
+      "bad_code": "import requests\n# Vulnerable: Hardcoded API key\nAPI_KEY = \"sk-1234567890abcdef\"\nheaders = {'Authorization': f'Bearer {API_KEY}'}\nresponse = requests.get('https://api.example.com/data', headers=headers)",
+      "good_code": "import os\nimport requests\n# Secure: Use environment variables for credentials\napi_key = os.environ.get('API_KEY')\nif not api_key:\n    raise ValueError(\"API key not configured\")\nheaders = {'Authorization': f'Bearer {api_key}'}\nresponse = requests.get('https://api.example.com/data', headers=headers)"
+    },
+    {
+      "id": 9,
+      "attack_type": "Hardcoded Secret",
+      "cve": "CVE-2018-1000861",
+      "attack_description": "Hardcoded secrets like encryption keys in source code",
+      "bad_code": "from cryptography.fernet import Fernet\n# Vulnerable: Hardcoded encryption key\nSECRET_KEY = b\"my-secret-key-32-bytes-long!!\"\ncipher = Fernet(SECRET_KEY)",
+      "good_code": "import os\nfrom cryptography.fernet import Fernet\n# Secure: Generate or load key from secure storage\ndef get_encryption_key():\n    key = os.environ.get('ENCRYPTION_KEY')\n    if not key:\n        # Generate new key if not available\n        key = Fernet.generate_key()\n        # Store securely (not in code)\n    return key\ncipher = Fernet(get_encryption_key())"
+    },
+    {
+      "id": 10,
+      "attack_type": "Use of Password Hash With Insufficient Computational Effort",
+      "cve": "CVE-2020-13942",
+      "attack_description": "Weak password hashing allows brute force attacks",
+      "bad_code": "import hashlib\n# Vulnerable: Simple MD5 hashing\ndef hash_password(password):\n    return hashlib.md5(password.encode()).hexdigest()",
+      "good_code": "import bcrypt\n# Secure: Use bcrypt with salt\ndef hash_password(password):\n    salt = bcrypt.gensalt(rounds=12)\n    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)\n    return hashed\ndef verify_password(password, hashed):\n    return bcrypt.checkpw(password.encode('utf-8'), hashed)"
+    },
+    {
+      "id": 11,
+      "attack_type": "Cross-site Scripting (XSS)",
+      "cve": "CVE-2020-11022",
+      "attack_description": "Reflected XSS through unvalidated user input",
+      "bad_code": "from flask import Flask, render_template_string\napp = Flask(__name__)\n# Vulnerable: Direct HTML insertion\n@app.route('/')\ndef index():\n    user_input = request.args.get('input', '')\n    template = f\"<div>{user_input}</div>\"\n    return render_template_string(template)",
+      "good_code": "from flask import Flask, render_template_string\nimport html\napp = Flask(__name__)\n# Secure: Escape HTML content\n@app.route('/')\ndef index():\n    user_input = request.args.get('input', '')\n    escaped_input = html.escape(user_input)\n    template = f\"<div>{escaped_input}</div>\"\n    return render_template_string(template)"
+    },
+    {
+      "id": 12,
+      "attack_type": "Code Injection",
+      "cve": "CVE-2020-11023",
+      "attack_description": "Code injection through eval() function",
+      "bad_code": "import eval\n# Vulnerable: Direct code evaluation\nuser_code = request.args.get('code')\nresult = eval(user_code)",
+      "good_code": "import ast\n# Secure: Use safe evaluation or disable eval\ndef safe_eval(expression):\n    # Only allow specific operations\n    allowed_names = {'__builtins__': {}}\n    tree = ast.parse(expression, mode='eval')\n    # Validate AST nodes here\n    return eval(expression, allowed_names)"
+    },
+    {
+      "id": 13,
+      "attack_type": "Regular Expression Denial of Service (ReDoS)",
+      "cve": "CVE-2021-26084",
+      "attack_description": "ReDoS through catastrophic backtracking regex",
+      "bad_code": "import re\n# Vulnerable: Catastrophic backtracking regex\npattern = r'^(a+)+$'\nmatches = re.match(pattern, input_string)",
+      "good_code": "import re\nimport signal\n# Secure: Use timeout or non-backtracking regex\ndef safe_regex_match(pattern, string, timeout=1):\n    def timeout_handler(signum, frame):\n        raise TimeoutError(\"Regex timeout\")\n    signal.signal(signal.SIGALRM, timeout_handler)\n    signal.alarm(timeout)\n    try:\n        return re.match(pattern, string)\n    finally:\n        signal.alarm(0)"
+    },
+    {
+      "id": 14,
+      "attack_type": "Open Redirect",
+      "cve": "CVE-2019-2729",
+      "attack_description": "Open redirect vulnerability allows phishing attacks",
+      "bad_code": "from flask import Flask, redirect\napp = Flask(__name__)\n# Vulnerable: Direct redirect without validation\n@app.route('/redirect')\ndef redirect_user():\n    url = request.args.get('url')\n    return redirect(url)",
+      "good_code": "from flask import Flask, redirect\napp = Flask(__name__)\n# Secure: Validate redirect URLs\ndef safe_redirect(url):\n    allowed_domains = ['example.com', 'trusted-site.com']\n    parsed = urlparse(url)\n    if parsed.netloc not in allowed_domains:\n        return redirect('/error')\n    return redirect(url)"
+    },
+    {
+      "id": 15,
+      "attack_type": "Jinja auto-escape is set to false.",
+      "cve": "CVE-2018-11776",
+      "attack_description": "Jinja2 template auto-escape disabled allows XSS",
+      "bad_code": "from flask import Flask, render_template\napp = Flask(__name__)\n# Vulnerable: Auto-escape disabled\napp.jinja_env.autoescape = False\n@app.route('/')\ndef index():\n    return render_template('index.html', user_input=request.args.get('input'))",
+      "good_code": "from flask import Flask, render_template\napp = Flask(__name__)\n# Secure: Keep auto-escape enabled\napp.jinja_env.autoescape = True\n@app.route('/')\ndef index():\n    return render_template('index.html', user_input=request.args.get('input'))"
+    },
+    {
+      "id": 16,
+      "attack_type": "Cross-Site Request Forgery (CSRF)",
+      "cve": "CVE-2020-13942",
+      "attack_description": "CSRF vulnerability allows unauthorized actions",
+      "bad_code": "from flask import Flask, request\napp = Flask(__name__)\n# Vulnerable: No CSRF protection\n@app.route('/transfer', methods=['POST'])\ndef transfer_money():\n    amount = request.form.get('amount')\n    account = request.form.get('account')\n    # Process transfer without CSRF token\n    return \"Transfer completed\"",
+      "good_code": "from flask import Flask, request\nfrom flask_wtf.csrf import CSRFProtect\napp = Flask(__name__)\napp.config['SECRET_KEY'] = 'your-secret-key'\ncsrf = CSRFProtect(app)\n# Secure: Use CSRF protection\n@app.route('/transfer', methods=['POST'])\ndef transfer_money():\n    # CSRF token automatically validated\n    amount = request.form.get('amount')\n    account = request.form.get('account')\n    return \"Transfer completed\""
+    },
+    {
+      "id": 17,
+      "attack_type": "Deserialization of Untrusted Data",
+      "cve": "CVE-2021-44228",
+      "attack_description": "Unsafe deserialization allows code execution",
+      "bad_code": "import pickle\n# Vulnerable: Direct deserialization\nwith open('data.pkl', 'rb') as f:\n    obj = pickle.load(f)",
+      "good_code": "import json\n# Secure: Use safe deserialization\nwith open('data.json', 'r') as f:\n    obj = json.load(f)\n# Or if pickle is required, validate the data source"
+    },
+    {
+      "id": 18,
+      "attack_type": "Server Information Exposure",
+      "cve": "CVE-2021-34527",
+      "attack_description": "Server information disclosure in error messages",
+      "bad_code": "from flask import Flask\napp = Flask(__name__)\n# Vulnerable: Debug mode enabled in production\napp.debug = True\n@app.route('/api/data')\ndef get_data():\n    # Detailed error messages expose server info\n    raise Exception(\"Database connection failed\")",
+      "good_code": "from flask import Flask\napp = Flask(__name__)\n# Secure: Disable debug mode and sanitize errors\napp.debug = False\n@app.route('/api/data')\ndef get_data():\n    try:\n        return get_data_from_db()\n    except Exception as e:\n        # Log error internally, return generic message\n        app.logger.error(f\"Database error: {e}\")\n        return \"Internal server error\", 500"
+    },
+    {
+      "id": 19,
+      "attack_type": "Debug Mode Enabled",
+      "cve": "CVE-2017-5645",
+      "attack_description": "Debug mode in production exposes sensitive information",
+      "bad_code": "from flask import Flask\napp = Flask(__name__)\n# Vulnerable: Debug mode in production\napp.run(debug=True, host='0.0.0.0')",
+      "good_code": "from flask import Flask\napp = Flask(__name__)\n# Secure: Disable debug mode in production\napp.run(debug=False, host='0.0.0.0')\n# Or use environment variable:\n# app.run(debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true')"
+    },
+    {
+      "id": 20,
+      "attack_type": "Insecure Temporary File",
+      "cve": "CVE-2019-0232",
+      "attack_description": "Insecure temporary file creation allows race conditions",
+      "bad_code": "import tempfile\n# Vulnerable: Predictable temporary file names\ntemp_file = tempfile.NamedTemporaryFile(delete=False)\ntemp_file.write(data)\ntemp_file.close()",
+      "good_code": "import tempfile\nimport os\n# Secure: Use secure temporary file creation\ndef create_secure_temp_file(data):\n    # Use secure permissions and random names\n    temp_file = tempfile.NamedTemporaryFile(\n        mode='w+b',\n        delete=False,\n        prefix='secure_',\n        suffix='.tmp'\n    )\n    # Set secure permissions\n    os.chmod(temp_file.name, 0o600)\n    temp_file.write(data)\n    temp_file.close()\n    return temp_file.name"
+    },
+    {
+      "id": 21,
+      "attack_type": "Improper Neutralization of Formula Elements in a CSV File",
+      "cve": "CVE-2020-7662",
+      "attack_description": "CSV injection allows formula execution in spreadsheets",
+      "bad_code": "import csv\n# Vulnerable: Direct CSV writing without sanitization\nwith open('data.csv', 'w', newline='') as file:\n    writer = csv.writer(file)\n    writer.writerow(['Name', 'Value'])\n    writer.writerow([user_input, '100'])",
+      "good_code": "import csv\nimport re\n# Secure: Sanitize CSV data\ndef sanitize_csv_value(value):\n    # Escape formula characters\n    if value and value[0] in ['=', '+', '-', '@', '\\t', '\\r']:\n        return \"'\" + value\n    return value\nwith open('data.csv', 'w', newline='') as file:\n    writer = csv.writer(file)\n    writer.writerow(['Name', 'Value'])\n    writer.writerow([sanitize_csv_value(user_input), '100'])"
+    },
+    {
+      "id": 22,
+      "attack_type": "Arbitrary File Write via Archive Extraction (Tar Slip)",
+      "cve": "CVE-2019-0708",
+      "attack_description": "Tar slip vulnerability allows writing files outside intended directory",
+      "bad_code": "import tarfile\n# Vulnerable: Direct tar extraction\nwith tarfile.open('archive.tar.gz', 'r:gz') as tar:\n    tar.extractall('/extract/path')",
+      "good_code": "import tarfile\nimport os\n# Secure: Validate paths before extraction\ndef safe_extract(tar_path, extract_path):\n    with tarfile.open(tar_path, 'r:gz') as tar:\n        for member in tar.getmembers():\n            # Check for path traversal\n            target_path = os.path.join(extract_path, member.name)\n            if not os.path.abspath(target_path).startswith(os.path.abspath(extract_path)):\n                raise ValueError(\"Path traversal detected\")\n        tar.extractall(extract_path)"
+    },
+    {
+      "id": 23,
+      "attack_type": "XPath Injection",
+      "cve": "CVE-2020-1472",
+      "attack_description": "XPath injection allows unauthorized data access",
+      "bad_code": "from lxml import etree\n# Vulnerable: Direct XPath with user input\nxpath_query = f\"//user[@id='{user_id}']\"\nusers = tree.xpath(xpath_query)",
+      "good_code": "from lxml import etree\n# Secure: Use parameterized XPath\ndef safe_xpath_query(tree, user_id):\n    # Use XPath with parameters\n    xpath_query = \"//user[@id=$user_id]\"\n    users = tree.xpath(xpath_query, user_id=user_id)\n    return users"
+    },
+    {
+      "id": 24,
+      "attack_type": "Use of a Broken or Risky Cryptographic Algorithm",
+      "cve": "CVE-2021-26855",
+      "attack_description": "Use of weak cryptographic algorithms",
+      "bad_code": "import hashlib\n# Vulnerable: Use of MD5 (broken)\ndef hash_data(data):\n    return hashlib.md5(data.encode()).hexdigest()",
+      "good_code": "import hashlib\n# Secure: Use SHA-256 or better\ndef hash_data(data):\n    return hashlib.sha256(data.encode()).hexdigest()\n# Or use modern cryptographic libraries:\n# from cryptography.hazmat.primitives import hashes\n# from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC"
+    },
+    {
+      "id": 25,
+      "attack_type": "Improper Validation of Certificate with Host Mismatch",
+      "cve": "CVE-2018-1000861",
+      "attack_description": "SSL certificate hostname validation bypass",
+      "bad_code": "import ssl\nimport socket\n# Vulnerable: No hostname validation\ncontext = ssl.create_default_context()\ncontext.check_hostname = False\ncontext.verify_mode = ssl.CERT_NONE",
+      "good_code": "import ssl\nimport socket\n# Secure: Proper hostname validation\ncontext = ssl.create_default_context()\ncontext.check_hostname = True\ncontext.verify_mode = ssl.CERT_REQUIRED"
+    }
+  ],
+  "metadata": {
+    "total_vulnerabilities": 25,
+    "unique_cves": [
+      "CVE-2017-5645",
+      "CVE-2018-1000861",
+      "CVE-2018-11776",
+      "CVE-2019-0232",
+      "CVE-2019-0708",
+      "CVE-2019-2729",
+      "CVE-2020-11022",
+      "CVE-2020-11023",
+      "CVE-2020-13942",
+      "CVE-2020-1472",
+      "CVE-2020-7662",
+      "CVE-2021-26084",
+      "CVE-2021-26855",
+      "CVE-2021-34527",
+      "CVE-2021-44228"
+    ],
+    "attack_types": [
+      "Path Traversal",
+      "Improper Certificate Validation",
+      "SQL Injection",
+      "Use of Hardcoded Passwords",
+      "Command Injection",
+      "Server-Side Request Forgery (SSRF)",
+      "Insecure Xml Parser",
+      "Use of Hardcoded Credentials",
+      "Hardcoded Secret",
+      "Use of Password Hash With Insufficient Computational Effort",
+      "Cross-site Scripting (XSS)",
+      "Code Injection",
+      "Regular Expression Denial of Service (ReDoS)",
+      "Open Redirect",
+      "Jinja auto-escape is set to false.",
+      "Cross-Site Request Forgery (CSRF)",
+      "Deserialization of Untrusted Data",
+      "Server Information Exposure",
+      "Debug Mode Enabled",
+      "Insecure Temporary File",
+      "Improper Neutralization of Formula Elements in a CSV File",
+      "Arbitrary File Write via Archive Extraction (Tar Slip)",
+      "XPath Injection",
+      "Use of a Broken or Risky Cryptographic Algorithm",
+      "Improper Validation of Certificate with Host Mismatch"
+    ],
+    "language": "Python",
+    "created_date": "2024-01-01",
+    "description": "Security vulnerability database with Python code examples showing both vulnerable and secure implementations"
+  }
+} 
