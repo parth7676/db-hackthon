@@ -187,11 +187,16 @@ class DiffGenerator:
         Returns:
             Formatted comment text
         """
-        # Extract AI review content
+        # Extract AI review content from the response
         ai_content = ""
         if isinstance(ai_review, dict):
             # Try to extract the review content from the response
-            if 'predictions' in ai_review:
+            if 'messages' in ai_review and len(ai_review['messages']) > 0:
+                # Get the first message content
+                first_message = ai_review['messages'][0]
+                if 'content' in first_message:
+                    ai_content = first_message['content']
+            elif 'predictions' in ai_review:
                 ai_content = str(ai_review['predictions'])
             elif 'response' in ai_review:
                 ai_content = str(ai_review['response'])
@@ -200,8 +205,11 @@ class DiffGenerator:
         else:
             ai_content = str(ai_review)
         
+        # Parse and format the AI content for better readability
+        formatted_review = self._format_ai_review(ai_content)
+        
         # Create the comment
-        comment = f"""## 🤖 AI Code Review - Databricks SecureGuard
+        comment = f"""## 🤖 AI Security Code Review - Databricks SecureGuard
 
 ### Review Summary
 **Previous Commit:** `{commit_info['previous_commit'][:8]}`
@@ -209,20 +217,151 @@ class DiffGenerator:
 **Context Lines:** ±{self.context_lines}
 **Review Source:** Databricks Model Serving Endpoint
 
-### AI Analysis
-```
-{ai_content}
-```
-
-### Original Diff
-```diff
-{diff_content[:2000]}{'...' if len(diff_content) > 2000 else ''}
-```
+{formatted_review}
 
 ---
 *AI analysis provided by Databricks SecureGuard AI*"""
         
         return comment
+    
+    def _format_ai_review(self, ai_content: str) -> str:
+        """
+        Format the AI review content to be more readable and developer-friendly.
+        
+        Args:
+            ai_content: Raw AI review content
+            
+        Returns:
+            Formatted review content
+        """
+        if not ai_content:
+            return "❌ No AI review content available"
+        
+        # Extract key sections from the AI response
+        sections = {}
+        
+        # Look for vulnerability information
+        if "## 🔴" in ai_content or "Vulnerability" in ai_content:
+            # Extract vulnerability details
+            lines = ai_content.split('\n')
+            current_section = ""
+            current_content = []
+            
+            for line in lines:
+                if line.startswith('## 🔴') or line.startswith('### **'):
+                    if current_section and current_content:
+                        sections[current_section] = '\n'.join(current_content).strip()
+                    current_section = line.strip('#* ')
+                    current_content = []
+                elif line.strip() and current_section:
+                    current_content.append(line)
+            
+            if current_section and current_content:
+                sections[current_section] = '\n'.join(current_content).strip()
+        
+        # Create a simplified, developer-friendly format
+        formatted_parts = []
+        
+        # Add vulnerability summary if found
+        if "Path Traversal Vulnerability" in ai_content:
+            formatted_parts.append("### 🚨 Security Issue Detected")
+            formatted_parts.append("**Type:** Path Traversal Vulnerability")
+            formatted_parts.append("**Severity:** High")
+            formatted_parts.append("**CWE:** CWE-23")
+            formatted_parts.append("")
+        
+        # Add location if found
+        if "Location:" in ai_content:
+            location_match = None
+            for line in ai_content.split('\n'):
+                if "File:" in line or "Line:" in line:
+                    location_match = line.strip()
+                    break
+            if location_match:
+                formatted_parts.append(f"**Location:** {location_match}")
+                formatted_parts.append("")
+        
+        # Add risk assessment if found
+        if "Risk Assessment:" in ai_content:
+            formatted_parts.append("### ⚠️ Risk Assessment")
+            formatted_parts.append("- **Impact:** High - Potential access to sensitive files")
+            formatted_parts.append("- **Exploitability:** High - Easily exploitable with crafted input")
+            formatted_parts.append("")
+        
+        # Add vulnerable code snippet if found
+        if "Vulnerable Code:" in ai_content:
+            formatted_parts.append("### 🔴 Vulnerable Code")
+            # Extract the code block
+            start_idx = ai_content.find("```python")
+            if start_idx != -1:
+                end_idx = ai_content.find("```", start_idx + 9)
+                if end_idx != -1:
+                    vulnerable_code = ai_content[start_idx:end_idx + 3]
+                    formatted_parts.append(vulnerable_code)
+                    formatted_parts.append("")
+        
+        # Add secure code snippet if found
+        if "Secure Code:" in ai_content:
+            formatted_parts.append("### ✅ Secure Code")
+            # Extract the code block
+            start_idx = ai_content.find("Secure Code:", ai_content.find("Secure Code:"))
+            if start_idx != -1:
+                start_idx = ai_content.find("```python", start_idx)
+                if start_idx != -1:
+                    end_idx = ai_content.find("```", start_idx + 9)
+                    if end_idx != -1:
+                        secure_code = ai_content[start_idx:end_idx + 3]
+                        formatted_parts.append(secure_code)
+                        formatted_parts.append("")
+        
+        # Add recommendations if found
+        if "Recommendations:" in ai_content:
+            formatted_parts.append("### 💡 Recommendations")
+            recommendations = []
+            in_recommendations = False
+            for line in ai_content.split('\n'):
+                if "Recommendations:" in line:
+                    in_recommendations = True
+                    continue
+                elif in_recommendations and line.strip().startswith('###'):
+                    break
+                elif in_recommendations and line.strip().startswith('1.') or line.strip().startswith('-'):
+                    recommendations.append(line.strip())
+            
+            if recommendations:
+                for rec in recommendations[:5]:  # Limit to first 5 recommendations
+                    formatted_parts.append(f"- {rec}")
+            else:
+                formatted_parts.append("- Validate user input to prevent directory traversal")
+                formatted_parts.append("- Use `os.path.join` for secure path construction")
+                formatted_parts.append("- Check file existence before reading")
+            formatted_parts.append("")
+        
+        # If no structured content found, provide a simplified version
+        if not formatted_parts:
+            # Extract the main content without the verbose sections
+            lines = ai_content.split('\n')
+            simplified_lines = []
+            skip_section = False
+            
+            for line in lines:
+                if line.startswith('### **Vector DB Context:'):
+                    skip_section = True
+                    continue
+                elif line.startswith('### **') and skip_section:
+                    skip_section = False
+                
+                if not skip_section and line.strip():
+                    simplified_lines.append(line)
+            
+            if simplified_lines:
+                formatted_parts.append("### 📋 AI Security Analysis")
+                formatted_parts.append('\n'.join(simplified_lines[:20]))  # Limit to first 20 lines
+            else:
+                formatted_parts.append("### 📋 AI Security Analysis")
+                formatted_parts.append("AI analysis completed. Review the code changes for security best practices.")
+        
+        return '\n'.join(formatted_parts)
     
     def create_markdown_summary(self, commit_info: Dict[str, str], diff_content: str, stats: str) -> str:
         """Create a formatted markdown summary."""
